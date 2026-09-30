@@ -75,6 +75,87 @@ class CleanerTests(unittest.TestCase):
         )
 
 
+class PdfParserOcrTests(unittest.TestCase):
+
+    class FakePage:
+        def __init__(self, text, ocr_text=""):
+            self.text = text
+            self.ocr_text = ocr_text
+            self.ocr_calls = []
+
+        def get_text(self, mode, textpage=None):
+            if textpage is not None:
+                return self.ocr_text
+            return self.text
+
+        def get_textpage_ocr(self, **kwargs):
+            self.ocr_calls.append(kwargs)
+            return object()
+
+    class FakeDocument:
+        def __init__(self, page):
+            self.page_count = 1
+            self.page = page
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def load_page(self, index):
+            return self.page
+
+    def setUp(self):
+        self.pdf_path = ROOT / "data" / "sample-service-manual.pdf"
+
+    def test_ocr_runs_only_on_text_poor_pages_when_enabled(self):
+        page = self.FakePage("", "Recognized torque specification")
+
+        with patch("src.pdf_parser.pymupdf.open", return_value=self.FakeDocument(page)):
+            pages = extract_pdf_pages(
+                self.pdf_path,
+                ocr_enabled=True,
+                ocr_language="eng",
+                ocr_dpi=250,
+                min_text_chars=20
+            )
+
+        self.assertEqual(pages[0]["text"], "Recognized torque specification")
+        self.assertTrue(pages[0]["ocr_used"])
+        self.assertEqual(page.ocr_calls, [{
+            "language": "eng",
+            "dpi": 250,
+            "full": True
+        }])
+
+    def test_ocr_is_not_used_for_native_text_or_when_disabled(self):
+        page = self.FakePage("Existing searchable manual text")
+
+        with patch("src.pdf_parser.pymupdf.open", return_value=self.FakeDocument(page)):
+            pages = extract_pdf_pages(
+                self.pdf_path,
+                ocr_enabled=True,
+                min_text_chars=10
+            )
+
+        self.assertEqual(pages[0]["text"], "Existing searchable manual text")
+        self.assertFalse(pages[0]["ocr_used"])
+        self.assertEqual(page.ocr_calls, [])
+
+    def test_ocr_failure_has_actionable_message(self):
+        page = self.FakePage("")
+
+        def fail_ocr(**kwargs):
+            raise RuntimeError("Tesseract executable not found")
+
+        page.get_textpage_ocr = fail_ocr
+
+        with patch("src.pdf_parser.pymupdf.open", return_value=self.FakeDocument(page)):
+            with self.assertRaisesRegex(RuntimeError, "Install Tesseract OCR"):
+                extract_pdf_pages(self.pdf_path, ocr_enabled=True)
+
+
 class VectorStoreTests(unittest.TestCase):
 
     def test_search_clamps_top_k_to_index_size(self):

@@ -1,12 +1,13 @@
 # Vehicle Specification Extractor
 
-A retrieval-augmented application for finding vehicle specifications in the supplied 2014 F-150 Workshop Manual. The system extracts PDF text, retrieves relevant passages, and asks a Groq-hosted language model to return cited structured JSON. It is intentionally text-only; it does not interpret diagrams or perform OCR.
+A retrieval-augmented application for finding vehicle specifications in the supplied 2014 F-150 Workshop Manual. The system extracts PDF text, retrieves relevant passages, and asks a Groq-hosted language model to return cited structured JSON. Optional OCR can recover text from scanned pages; diagrams and visual interpretation remain out of scope.
 
 ## Requirements
 
 - Python 3.10 or newer
 - A Groq API key
 - The provided manual at `data/sample-service-manual.pdf`
+- Optional: Tesseract OCR for scanned/text-poor PDF pages
 
 ## Setup
 
@@ -21,6 +22,8 @@ Copy-Item .env.example .env
 ```
 
 Edit `.env` and set `GROQ_API_KEY` to a valid key. `GROQ_MODEL` is optional; it defaults to `openai/gpt-oss-120b`. Keep credentials in `.env`, not in source control or `.env.example`.
+
+OCR is disabled by default. To enable OCR fallback for pages with little embedded text, install Tesseract OCR separately and make sure its executable and language data are available to PyMuPDF. On Windows, install Tesseract (including the English language data) and add its installation directory to `PATH`, then set `OCR_ENABLED=true` in `.env`. `OCR_LANGUAGE`, `OCR_DPI`, and `OCR_MIN_TEXT_CHARS` configure the OCR language, rendering resolution, and threshold for deciding a page needs OCR. OCR can slow ingestion substantially. PyMuPDF's OCR interface is included with the Python package, but the Tesseract engine itself is an external system dependency.
 
 The first run downloads the `all-MiniLM-L6-v2` embedding model from Hugging Face. The embedding model and the manual's FAISS index are held in memory; the index is rebuilt on each application start.
 
@@ -42,7 +45,7 @@ Ask a question such as “How is rear ride height measured on F-150 models other
 
 ## Design
 
-1. `src/pdf_parser.py` extracts text page by page with PyMuPDF and retains PDF page numbers.
+1. `src/pdf_parser.py` extracts text page by page with PyMuPDF and retains PDF page numbers. When enabled, it OCRs pages whose embedded text is below the configured threshold and records whether OCR was used.
 2. `src/cleaner.py` normalizes whitespace and known line-leading PDF bullet artifacts.
 3. `src/chunker.py` creates overlapping chunks, prefers paragraph/line/sentence boundaries, and carries section metadata across pages.
 4. `src/embeddings.py` creates normalized document and query embeddings with Sentence Transformers.
@@ -81,6 +84,6 @@ This command reads the five cases in `evaluation/extraction_cases.json`, retriev
 - Both benchmarks are intentionally small: retrieval cases focus on ride-height procedures, while four extraction cases cover front brake torque, brake-fluid capacity, a rear shock absorber part number, and not-found behavior. Expand the gold set across more components, configurations, and specification types before drawing broad accuracy conclusions.
 - The evaluator checks exact expected fields and whether evidence is quoted from retrieved context, but neither Pydantic nor substring checks can fully prove semantic entailment. Human review remains important for safety-critical specifications.
 - Chunk boundaries are improved but remain text-based; complex multi-column tables may not preserve row/column relationships.
-- Scanned pages have no OCR fallback, by design for this text-only assignment.
+- OCR is optional and requires a separately installed Tesseract engine; it is disabled by default and may produce recognition errors on low-quality scans or complex tables.
 - Hybrid retrieval uses a fixed BM25-weighted reciprocal-rank fusion rule and has not been tuned beyond the included small benchmark; evaluate it on a larger question set before changing the weighting or adding reranking.
 - The index is rebuilt at startup and is not persisted to disk.
