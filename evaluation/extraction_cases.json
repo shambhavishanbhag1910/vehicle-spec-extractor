@@ -1,0 +1,104 @@
+[
+  {
+    "id": "front-brake-caliper-anchor-bolt-torque",
+    "query": "What is the torque specification for the front brake caliper anchor plate bolts? Include both listed units.",
+    "expected_status": "found",
+    "relevant_pages": [636],
+    "expected_results": [
+      {
+        "component": "Brake caliper anchor plate bolts",
+        "spec_type": "Torque",
+        "value": "250",
+        "unit": "Nm",
+        "alternate_value": "184",
+        "alternate_unit": "lb-ft",
+        "vehicle": "2014 F-150",
+        "section": "206-03",
+        "page": 636
+      }
+    ],
+    "source_facts": [
+      {
+        "page": 636,
+        "text": "Brake caliper anchor plate bolts\n250 184"
+      }
+    ]
+  },
+  {
+    "id": "front-brake-fluid-fill-capacity",
+    "query": "What is the specified fill capacity for High Performance DOT 3 Motor Vehicle Brake Fluid in the front disc brake section? Include the alternate unit if listed.",
+    "expected_status": "found",
+    "relevant_pages": [636],
+    "expected_results": [
+      {
+        "component": "High Performance DOT 3 Motor Vehicle Brake Fluid",
+        "spec_type": "Fill Capacity",
+        "value": "1,420",
+        "unit": "ml",
+        "alternate_value": "3",
+        "alternate_unit": "pt",
+        "vehicle": "2014 F-150",
+        "section": "206-03",
+        "page": 636
+      }
+    ],
+    "source_facts": [
+      {
+        "page": 636,
+        "text": "1,420 ml\n(3 pt)"
+      }
+    ]
+  },
+  {
+    "id": "rear-shock-parts-illustration-number",
+    "query": "In the rear suspension shock absorber parts illustration, what part number is listed for the shock absorber? Use only the illustrated parts table.",
+    "expected_status": "found",
+    "relevant_pages": [132],
+    "expected_results": [
+      {
+        "component": "Shock absorber",
+        "spec_type": "Part Number",
+        "part_number": "18125",
+        "vehicle": "2014 F-150",
+        "section": "204-02",
+        "page": 132
+      }
+    ],
+    "source_facts": [
+      {
+        "page": 132,
+        "text": "18125\nShock absorber"
+      }
+    ]
+  },
+  {
+    "id": "rear-shock-all-vehicles-procedure-number",
+    "query": "In the rear suspension shock absorber removal and installation parts list under All Vehicles, what part number is listed for the shock absorber? Use only that parts list.",
+    "expected_status": "found",
+    "relevant_pages": [133],
+    "expected_results": [
+      {
+        "component": "Shock absorber",
+        "spec_type": "Part Number",
+        "part_number": "18080",
+        "vehicle": "2014 F-150",
+        "section": "204-02",
+        "page": 133
+      }
+    ],
+    "source_facts": [
+      {
+        "page": 133,
+        "text": "18080\nShock absorber"
+      }
+    ]
+  },
+  {
+    "id": "unsupported-vehicle-not-found",
+    "query": "What is the towing capacity for a 2024 Toyota Camry?",
+    "expected_status": "not_found",
+    "relevant_pages": [],
+    "expected_results": [],
+    "source_facts": []
+  }
+]

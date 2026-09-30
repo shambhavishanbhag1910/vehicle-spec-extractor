@@ -1,0 +1,39 @@
+[
+  {
+    "id": "front-ride-height-formula",
+    "query": "How do I calculate front ride height using the two surface-gauge readings?",
+    "relevant_pages": [17, 18],
+    "source_facts": [
+      {
+        "page": 17,
+        "text": "Ride height = 2 - 3"
+      },
+      {
+        "page": 17,
+        "text": "center of the rearward lower arm bolt"
+      }
+    ]
+  },
+  {
+    "id": "rear-ride-height-standard",
+    "query": "How is rear ride height measured on F-150 models other than the SVT Raptor?",
+    "relevant_pages": [19],
+    "source_facts": [
+      {
+        "page": 19,
+        "text": "rear axle jounce stop (Item 2) and the top of the rear axle tube (Item 3)"
+      }
+    ]
+  },
+  {
+    "id": "rear-ride-height-raptor",
+    "query": "How does the SVT Raptor rear ride-height measurement differ?",
+    "relevant_pages": [20],
+    "source_facts": [
+      {
+        "page": 20,
+        "text": "rear frame rail (Item 2) and the top of the rear axle tube (Item 3)"
+      }
+    ]
+  }
+]

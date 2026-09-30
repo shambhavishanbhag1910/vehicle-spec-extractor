@@ -7,7 +7,11 @@ def clean_text(text: str) -> str:
     text = re.sub(r"file:///C:/[^\n]+", " ", text)
 
     # Normalize bullet artifacts
-    text = text.replace("z ", "• ")
+    text = re.sub(
+        r"(?m)^([ \t]*)z(?= )",
+        r"\1•",
+        text
+    )
 
     # Normalize broken whitespace
     text = re.sub(r"[ \t]+", " ", text)

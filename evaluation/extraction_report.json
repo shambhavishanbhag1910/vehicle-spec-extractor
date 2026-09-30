@@ -1,0 +1,149 @@
+{
+  "pdf": "D:\\Predii\\vehicle-spec-extractor\\data\\sample-service-manual.pdf",
+  "model": "openai/gpt-oss-120b",
+  "top_k": 5,
+  "cases_passed": 3,
+  "cases_total": 4,
+  "exact_case_accuracy": 0.75,
+  "status_accuracy": 1.0,
+  "expected_fields_accuracy": 0.75,
+  "evidence_grounding_rate": 1.0,
+  "relevant_page_recall": 1.0,
+  "cases": [
+    {
+      "id": "front-brake-caliper-anchor-bolt-torque",
+      "passed": true,
+      "status_correct": true,
+      "expected_fields_correct": true,
+      "evidence_grounded": true,
+      "relevant_page_retrieved": true,
+      "retrieved_pages": [
+        617,
+        618,
+        619,
+        636,
+        637
+      ],
+      "response": {
+        "status": "found",
+        "results": [
+          {
+            "component": "Brake caliper anchor plate bolts",
+            "spec_type": "torque",
+            "value": "250",
+            "unit": "Nm",
+            "part_number": null,
+            "alternate_value": "184",
+            "alternate_unit": "lb-ft",
+            "vehicle": "2014 F-150",
+            "configuration": null,
+            "section": "206-03",
+            "page": 636,
+            "evidence": "Brake caliper anchor plate bolts \n250 184 \n\u2014"
+          }
+        ]
+      }
+    },
+    {
+      "id": "front-brake-fluid-fill-capacity",
+      "passed": true,
+      "status_correct": true,
+      "expected_fields_correct": true,
+      "evidence_grounded": true,
+      "relevant_page_retrieved": true,
+      "retrieved_pages": [
+        599,
+        600,
+        636,
+        637,
+        696
+      ],
+      "response": {
+        "status": "found",
+        "results": [
+          {
+            "component": "High Performance DOT 3 Motor Vehicle Brake Fluid",
+            "spec_type": "Fill Capacity",
+            "value": "1,420",
+            "unit": "ml",
+            "part_number": null,
+            "alternate_value": "3",
+            "alternate_unit": "pt",
+            "vehicle": "2014 F-150",
+            "configuration": null,
+            "section": "206-03",
+            "page": 636,
+            "evidence": "1,420 ml (3 pt)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rear-shock-absorber-part-number",
+      "passed": false,
+      "status_correct": true,
+      "expected_fields_correct": false,
+      "evidence_grounded": true,
+      "relevant_page_retrieved": true,
+      "retrieved_pages": [
+        131,
+        132,
+        133,
+        134,
+        135
+      ],
+      "response": {
+        "status": "found",
+        "results": [
+          {
+            "component": "Shock absorber",
+            "spec_type": "part_number",
+            "value": "",
+            "unit": "",
+            "part_number": "18125",
+            "alternate_value": null,
+            "alternate_unit": null,
+            "vehicle": "2014 F-150",
+            "configuration": null,
+            "section": "204-02",
+            "page": 132,
+            "evidence": "3 \n 18125 \n Shock absorber"
+          },
+          {
+            "component": "Shock absorber",
+            "spec_type": "part_number",
+            "value": "",
+            "unit": "",
+            "part_number": "18080",
+            "alternate_value": null,
+            "alternate_unit": null,
+            "vehicle": "2014 F-150",
+            "configuration": null,
+            "section": "204-02",
+            "page": 133,
+            "evidence": "3 \n 18080 \n Shock absorber"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unsupported-vehicle-not-found",
+      "passed": true,
+      "status_correct": true,
+      "expected_fields_correct": true,
+      "evidence_grounded": true,
+      "relevant_page_retrieved": null,
+      "retrieved_pages": [
+        141,
+        142,
+        830,
+        831,
+        832
+      ],
+      "response": {
+        "status": "not_found",
+        "results": []
+      }
+    }
+  ]
+}

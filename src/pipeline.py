@@ -4,7 +4,7 @@ from src.chunker import chunk_pages
 from src.embeddings import EmbeddingModel
 from src.vector_store import FaissVectorStore
 from src.retriever import Retriever
-from src.extractor import OpenAIExtractor
+from src.extractor import GroqExtractor
 
 
 class VehicleSpecificationPipeline:
@@ -17,7 +17,7 @@ class VehicleSpecificationPipeline:
 
         self.retriever = None
 
-        self.extractor = OpenAIExtractor()
+        self.extractor = GroqExtractor()
 
 
     def ingest(self, pdf_path):
@@ -72,6 +72,11 @@ class VehicleSpecificationPipeline:
         query,
         top_k=5
     ):
+
+        if self.retriever is None:
+            raise RuntimeError(
+                "Ingest a service manual before asking questions."
+            )
 
         chunks = self.retriever.retrieve(
             query,
