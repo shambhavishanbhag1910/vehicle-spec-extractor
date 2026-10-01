@@ -1,89 +1,194 @@
 # Vehicle Specification Extractor
 
-A retrieval-augmented application for finding vehicle specifications in the supplied 2014 F-150 Workshop Manual. The system extracts PDF text, retrieves relevant passages, and asks a Groq-hosted language model to return cited structured JSON. Optional OCR can recover text from scanned pages; diagrams and visual interpretation remain out of scope.
+A compact RAG based application for extracting structured vehicle specifications from the supplied **2014 Ford F-150 Workshop Manual**.
 
-## Requirements
+It supports queries for torque values, fluid capacities, part numbers, ride height procedures, and other service specifications, and returns structured JSON with page, section, and evidence.
 
-- Python 3.10 or newer
-- A Groq API key
-- The provided manual at `data/sample-service-manual.pdf`
-- Optional: Tesseract OCR for scanned/text-poor PDF pages
+## Architecture
+
+```text
+PDF
+ -> PyMuPDF text extraction
+ -> Cleaning
+ -> Section aware chunking
+ -> Sentence Transformers embeddings
+ -> FAISS semantic search
+ +  BM25 lexical search
+ -> Weighted rank fusion
+ -> Relevant context
+ -> Groq LLM
+ -> Pydantic validation
+ -> Structured JSON
+```
+
+### Main design choices
+
+- **Chunking:** section aware, up to 1200 characters with 200 character overlap
+- **Embeddings:** `all-MiniLM-L6-v2`
+- **Vector store:** FAISS `IndexFlatIP`
+- **Lexical retrieval:** BM25
+- **Retrieval:** hybrid FAISS + BM25 using weighted Reciprocal Rank Fusion
+- **LLM:** Groq hosted model
+- **Validation:** Pydantic
+- **Interfaces:** CLI and Streamlit
+- **Optional OCR:** Tesseract fallback for text poor pages
+
+## Project Structure
+
+```text
+vehicle-spec-extractor/
+|-- data/
+|   `-- sample-service-manual.pdf
+|-- src/
+|   |-- pdf_parser.py
+|   |-- cleaner.py
+|   |-- chunker.py
+|   |-- embeddings.py
+|   |-- vector_store.py
+|   |-- retriever.py
+|   |-- extractor.py
+|   |-- schemas.py
+|   `-- pipeline.py
+|-- evaluation/
+|   |-- cases.json
+|   |-- extraction_cases.json
+|   |-- run_retrieval_eval.py
+|   |-- run_extraction_eval.py
+|   `-- extraction_report_final.json
+|-- tests/
+|   `-- test_components.py
+|-- main.py
+|-- app.py
+|-- requirements.txt
+|-- .env.example
+`-- README.md
+```
 
 ## Setup
-
-In PowerShell from the repository root:
 
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
 pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `.env` and set `GROQ_API_KEY` to a valid key. `GROQ_MODEL` is optional; it defaults to `openai/gpt-oss-120b`. Keep credentials in `.env`, not in source control or `.env.example`.
+Set your Groq key in `.env`:
 
-OCR is disabled by default. To enable OCR fallback for pages with little embedded text, install Tesseract OCR separately and make sure its executable and language data are available to PyMuPDF. On Windows, install Tesseract (including the English language data) and add its installation directory to `PATH`, then set `OCR_ENABLED=true` in `.env`. `OCR_LANGUAGE`, `OCR_DPI`, and `OCR_MIN_TEXT_CHARS` configure the OCR language, rendering resolution, and threshold for deciding a page needs OCR. OCR can slow ingestion substantially. PyMuPDF's OCR interface is included with the Python package, but the Tesseract engine itself is an external system dependency.
-
-The first run downloads the `all-MiniLM-L6-v2` embedding model from Hugging Face. The embedding model and the manual's FAISS index are held in memory; the index is rebuilt on each application start.
+```text
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=openai/gpt-oss-120b
+OCR_ENABLED=false
+```
 
 ## Run
 
-Start the Streamlit UI:
-
-```powershell
-streamlit run app.py
-```
-
-Or use the interactive terminal application:
+### CLI
 
 ```powershell
 python main.py
 ```
 
-Ask a question such as “How is rear ride height measured on F-150 models other than the SVT Raptor?” The result is a JSON object with `status` and `results`. Each specification includes its component, type, value and unit when applicable, optional part number/configuration, source page, and supporting evidence.
+### Streamlit
 
-## Design
+```powershell
+streamlit run app.py
+```
 
-1. `src/pdf_parser.py` extracts text page by page with PyMuPDF and retains PDF page numbers. When enabled, it OCRs pages whose embedded text is below the configured threshold and records whether OCR was used.
-2. `src/cleaner.py` normalizes whitespace and known line-leading PDF bullet artifacts.
-3. `src/chunker.py` creates overlapping chunks, prefers paragraph/line/sentence boundaries, and carries section metadata across pages.
-4. `src/embeddings.py` creates normalized document and query embeddings with Sentence Transformers.
-5. `src/vector_store.py` indexes vectors in FAISS using inner product, equivalent to cosine similarity for normalized vectors.
-6. `src/retriever.py` combines FAISS semantic results with BM25 lexical results using BM25-weighted reciprocal-rank fusion. It adds bounded adjacent-page context from the same section so procedures spanning page breaks remain available to the extractor.
-7. `src/extractor.py` sends only the retrieved context and question to Groq in JSON mode, then validates the response with the Pydantic models in `src/schemas.py`.
+## Example Queries
 
-`app.py` provides the Streamlit interface and caches its in-memory pipeline. `main.py` provides the CLI. The main orchestration lives in `src/pipeline.py`.
+```text
+What is the torque specification for the front brake caliper anchor plate bolts? Include both listed units.
+```
 
-## Tests and retrieval evaluation
+```text
+What is the specified fill capacity for High Performance DOT 3 Motor Vehicle Brake Fluid in the front disc brake section? Include the alternate unit if listed.
+```
 
-Run offline unit tests and verify that the evaluation facts still exist in the supplied PDF:
+```text
+In the rear suspension shock absorber parts illustration, what part number is listed for the shock absorber? Use only the illustrated parts table.
+```
+
+```text
+What is the towing capacity for a 2024 Toyota Camry?
+```
+
+Unsupported questions return:
+
+```json
+{
+  "status": "not_found",
+  "results": []
+}
+```
+
+## Testing
+
+### Unit tests
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-Run the hybrid retrieval benchmark:
+Result:
+
+```text
+20 / 20 PASS
+```
+
+### Retrieval evaluation
 
 ```powershell
 python -m evaluation.run_retrieval_eval --top-k 5
 ```
 
-The benchmark combines `evaluation/cases.json` and the positive cases in `evaluation/extraction_cases.json`, using their expected source pages to report Recall@k across ride-height, torque, fluid-capacity, and part-number questions. The first run may download the embedding model and embed the full manual. This benchmark does not call Groq.
+Result:
 
-Run the end-to-end gold-answer evaluation with explicit permission to make live Groq requests:
-
-```powershell
-python -m evaluation.run_extraction_eval --call-llm --top-k 5 --output evaluation/extraction_report.json
+```text
+Recall@5: 7/7 (100.0%)
 ```
 
-This command reads the five cases in `evaluation/extraction_cases.json`, retrieves context, calls Groq once per case, validates each answer, compares expected fields, checks that evidence is quoted from retrieved context, and reports exact-case accuracy plus status, field, evidence, and relevant-page metrics. The part-number cases distinguish the illustration's `18125` from the separate “All Vehicles” procedure list's `18080`; the not-found case tests refusal for a different vehicle. Live evaluation sends API requests and may incur charges; it requires a working `GROQ_API_KEY` in `.env`. The report contains model answers and evidence but never API credentials.
+### End to end extraction evaluation
 
-## Limitations and next improvements
+```powershell
+python -m evaluation.run_extraction_eval --call-llm --top-k 5 --output evaluation/extraction_report_final.json
+```
 
-- Both benchmarks are intentionally small: retrieval cases focus on ride-height procedures, while four extraction cases cover front brake torque, brake-fluid capacity, a rear shock absorber part number, and not-found behavior. Expand the gold set across more components, configurations, and specification types before drawing broad accuracy conclusions.
-- The evaluator checks exact expected fields and whether evidence is quoted from retrieved context, but neither Pydantic nor substring checks can fully prove semantic entailment. Human review remains important for safety-critical specifications.
-- Chunk boundaries are improved but remain text-based; complex multi-column tables may not preserve row/column relationships.
-- OCR is optional and requires a separately installed Tesseract engine; it is disabled by default and may produce recognition errors on low-quality scans or complex tables.
-- Hybrid retrieval uses a fixed BM25-weighted reciprocal-rank fusion rule and has not been tuned beyond the included small benchmark; evaluate it on a larger question set before changing the weighting or adding reranking.
-- The index is rebuilt at startup and is not persisted to disk.
+Final result:
+
+```text
+Exact case accuracy: 5/5 (100.0%)
+
+PASS front-brake-caliper-anchor-bolt-torque
+PASS front-brake-fluid-fill-capacity
+PASS rear-shock-parts-illustration-number
+PASS rear-shock-all-vehicles-procedure-number
+PASS unsupported-vehicle-not-found
+```
+
+Final metrics:
+
+```text
+Unit tests:               20/20 PASS
+Retrieval Recall@5:       100%
+End to end cases:         5/5 PASS
+Exact case accuracy:      100%
+Evidence grounding rate:  100%
+Relevant page recall:     100%
+```
+
+## Notes
+
+- The full manual is not sent to the LLM. Only retrieved chunks are passed to Groq.
+- Page and section metadata are preserved for traceability.
+- Source context handling distinguishes nearby tables or procedures when the same component appears more than once.
+- The FAISS index is currently rebuilt on startup.
+- Chunking is text based rather than fully table aware.
+- OCR is optional and requires Tesseract.
+- The evaluation set is intentionally small and is intended for assignment level validation, not production benchmarking.
+
+## Security
+
+Keep the real Groq API key only in `.env`.
+
+`.env` is excluded by `.gitignore`.
