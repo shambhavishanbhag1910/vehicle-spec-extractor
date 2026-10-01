@@ -2,25 +2,47 @@
   "pdf": "D:\\Predii\\vehicle-spec-extractor\\data\\sample-service-manual.pdf",
   "model": "openai/gpt-oss-120b",
   "top_k": 5,
-  "cases_passed": 2,
+  "cases_passed": 5,
   "cases_total": 5,
-  "exact_case_accuracy": 0.4,
+  "exact_case_accuracy": 1.0,
   "status_accuracy": 1.0,
-  "expected_fields_accuracy": 0.5,
+  "expected_fields_accuracy": 1.0,
   "evidence_grounding_rate": 1.0,
   "relevant_page_recall": 1.0,
   "cases": [
     {
       "id": "front-brake-caliper-anchor-bolt-torque",
-      "passed": false,
-      "error": "ValueError: Groq returned JSON that does not match the extraction schema.",
+      "passed": true,
+      "status_correct": true,
+      "expected_fields_correct": true,
+      "evidence_grounded": true,
+      "relevant_page_retrieved": true,
       "retrieved_pages": [
         617,
         618,
         619,
         636,
         637
-      ]
+      ],
+      "response": {
+        "status": "found",
+        "results": [
+          {
+            "component": "Brake caliper anchor plate bolts",
+            "spec_type": "Torque",
+            "value": "250",
+            "unit": "Nm",
+            "part_number": null,
+            "alternate_value": "184",
+            "alternate_unit": "lb-ft",
+            "vehicle": "2014 F-150",
+            "configuration": null,
+            "section": "206-03",
+            "page": 636,
+            "evidence": "Brake caliper anchor plate bolts \n250 184"
+          }
+        ]
+      }
     },
     {
       "id": "front-brake-fluid-fill-capacity",
@@ -58,9 +80,9 @@
     },
     {
       "id": "rear-shock-parts-illustration-number",
-      "passed": false,
+      "passed": true,
       "status_correct": true,
-      "expected_fields_correct": false,
+      "expected_fields_correct": true,
       "evidence_grounded": true,
       "relevant_page_retrieved": true,
       "retrieved_pages": [
@@ -75,7 +97,7 @@
         "results": [
           {
             "component": "Shock absorber",
-            "spec_type": "part_number",
+            "spec_type": "Part Number",
             "value": null,
             "unit": null,
             "part_number": "18125",
@@ -92,9 +114,9 @@
     },
     {
       "id": "rear-shock-all-vehicles-procedure-number",
-      "passed": false,
+      "passed": true,
       "status_correct": true,
-      "expected_fields_correct": false,
+      "expected_fields_correct": true,
       "evidence_grounded": true,
       "relevant_page_retrieved": true,
       "retrieved_pages": [
@@ -109,7 +131,7 @@
         "results": [
           {
             "component": "Shock absorber",
-            "spec_type": "part_number",
+            "spec_type": "Part Number",
             "value": null,
             "unit": null,
             "part_number": "18080",

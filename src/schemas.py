@@ -53,7 +53,18 @@ class Specification(BaseModel):
             normalized,
             value.strip()
         )
+    @field_validator(
+        "value",
+        "alternate_value",
+        mode="before"
+    )
+    @classmethod
+    def normalize_measurement_values(cls, value):
 
+        if value is None:
+            return None
+
+        return str(value).strip()
 
 class ExtractionResponse(BaseModel):
 
