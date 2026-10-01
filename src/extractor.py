@@ -1,5 +1,5 @@
 import os
-
+import re
 from groq import Groq
 from pydantic import ValidationError
 
@@ -7,33 +7,126 @@ from src.schemas import ExtractionResponse
 
 
 SYSTEM_PROMPT = """
-You are a technical specification extraction system.
+You are a precise automotive service manual specification extraction system.
 
-Extract information only from the supplied
-automotive service manual context.
+Use ONLY the supplied SERVICE MANUAL CONTEXT.
+Never use outside knowledge.
+Never guess or infer a value that is not directly supported.
 
-Rules:
+IMPORTANT: The retrieved context may contain the same component more than once
+with different part numbers or specifications because the component appears in
+different tables, illustrations, procedures, or applicability blocks.
 
-1. Do not use outside knowledge.
-2. Do not invent missing specifications.
-3. Preserve exact numeric values.
-4. Preserve exact measurement units.
-5. Preserve vehicle configuration when given.
-6. If multiple valid specifications exist,
-   return all of them.
-    Return only specifications directly requested by the query. Do not include
-    nearby values for the same component from a different procedure or context
-    unless the query asks for alternatives or a comparison.
-7. If no answer exists in the context,
-   return status = "not_found".
-8. Include the supporting source text.
-    Evidence must be a verbatim quote from the supplied context.
-9. Return valid JSON only.
+You MUST first determine the exact source context requested by the user,
+and only then extract the value.
 
-Return one JSON object matching this schema. Use status "not_found" and an empty
-results list when the supplied context does not support an answer. For part-number
-questions, populate part_number and do not place a part number in a measurement value.
-Do not add Markdown fences or fields outside this schema.
+SOURCE SELECTION RULES
+
+1. Treat source wording in the user's query as a HARD CONSTRAINT.
+
+Examples include:
+- parts illustration
+- illustrated parts table
+- illustration
+- All Vehicles
+- removal and installation parts list
+- specifications table
+- torque specifications
+- a specific procedure
+- a specific vehicle configuration
+
+2. If the query asks for a "parts illustration",
+"illustrated parts table", or "illustration":
+
+   - Use ONLY the parts table associated with that illustration.
+   - If the retrieved context also contains a later "All Vehicles" heading,
+     DO NOT use any value appearing under the "All Vehicles" heading.
+   - A part number from an All Vehicles procedure is NOT a valid answer
+     to a parts illustration question.
+   - Stop considering other occurrences once the matching illustrated
+     parts table has been identified.
+
+3. If the query explicitly asks for a part number from
+"All Vehicles":
+
+   - Use ONLY the part number appearing in the content governed by the
+     "All Vehicles" heading.
+   - Do NOT use a part number from a preceding illustration or illustrated
+     parts table.
+   - A value appearing before the All Vehicles heading is not a valid answer
+     unless the query explicitly asks for the illustration.
+
+4. Do not combine values across source boundaries.
+
+The following are separate source contexts:
+- illustrated parts table
+- All Vehicles parts list
+- removal procedure
+- installation procedure
+- specification table
+- different vehicle configuration
+- different page or subsection when the context clearly changes
+
+5. When the same component appears more than once:
+
+   FIRST identify which occurrence belongs to the source requested
+   by the user.
+
+   THEN ignore all occurrences belonging to other source contexts.
+
+   Do NOT choose a value merely because:
+   - it appears later,
+   - it has more surrounding text,
+   - it appears on an adjacent page,
+   - or it has the same component name.
+
+6. For a source-specific query, return exactly ONE result unless
+the user explicitly requests multiple results or a comparison.
+
+7. If you cannot determine which occurrence belongs to the exact
+source requested by the user, return:
+
+{
+    "status": "not_found",
+    "results": []
+}
+
+Never fall back to a value from a different source context.
+
+VALUE RULES
+
+8. Preserve exact component names, numeric values, units, and part numbers
+from the selected source.
+
+9. For part-number questions:
+   - populate "part_number"
+   - set "value" to null
+   - set "unit" to null
+   - do not put a part number in "value"
+
+10. Evidence MUST be a verbatim quote from the SAME selected source
+that supports the returned result.
+
+11. The output page number MUST be the page containing the exact
+source used for the answer.
+
+12. Preserve vehicle configuration when explicitly stated.
+
+13. If the requested answer does not exist in the requested source,
+return "not_found". Do not substitute another occurrence.
+
+14. When SOURCE_CONTEXT labels are supplied, treat those labels as
+structural metadata for source selection.
+
+15. For a parts illustration or illustrated parts table query, use only
+PARTS_TABLE_WITHOUT_ALL_VEHICLES_HEADING.
+
+16. For an All Vehicles query, use only ALL_VEHICLES_CONTEXT.
+OUTPUT
+
+Return valid JSON only.
+
+Successful response:
 
 {
     "status": "found",
@@ -41,8 +134,8 @@ Do not add Markdown fences or fields outside this schema.
         {
             "component": "",
             "spec_type": "",
-            "value": "",
-            "unit": "",
+            "value": null,
+            "unit": null,
             "part_number": null,
             "alternate_value": null,
             "alternate_unit": null,
@@ -54,8 +147,43 @@ Do not add Markdown fences or fields outside this schema.
         }
     ]
 }
+
+Unsupported response:
+
+{
+    "status": "not_found",
+    "results": []
+}
+
+Do not output Markdown.
+Do not provide explanations outside the JSON.
 """
 
+def identify_source_context(text: str) -> str:
+
+    normalized = re.sub(
+        r"\s+",
+        " ",
+        text
+    ).casefold()
+
+    has_parts_table = (
+        "item part number description"
+        in normalized
+    )
+
+    has_all_vehicles = (
+        "all vehicles"
+        in normalized
+    )
+
+    if has_all_vehicles:
+        return "ALL_VEHICLES_CONTEXT"
+
+    if has_parts_table:
+        return "PARTS_TABLE_WITHOUT_ALL_VEHICLES_HEADING"
+
+    return "GENERAL_CONTEXT"
 
 class GroqExtractor:
 
@@ -91,13 +219,23 @@ class GroqExtractor:
 
         for chunk in retrieved_chunks:
 
+            source_context = identify_source_context(
+                chunk["text"]
+            )
+
             context_parts.append(
                 f"""
-PAGE: {chunk['page_number']}
-SECTION: {chunk.get('section_id')}
+        ======== SOURCE BLOCK ========
 
-CONTENT:
-{chunk['text']}
+        PAGE: {chunk['page_number']}
+        SECTION: {chunk.get('section_id')}
+        SOURCE_CONTEXT: {source_context}
+
+        CONTENT:
+        {chunk['text']}
+
+        ======== END SOURCE BLOCK ========
+
 """
             )
 
@@ -109,6 +247,49 @@ CONTENT:
 USER QUERY:
 
 {query}
+
+SOURCE SELECTION RULE:
+
+The retrieved material is divided into SOURCE BLOCKS.
+
+Each block contains a SOURCE_CONTEXT label.
+
+If the user asks for:
+
+"parts illustration",
+"illustrated parts table",
+or "illustration"
+
+then use:
+
+SOURCE_CONTEXT:
+PARTS_TABLE_WITHOUT_ALL_VEHICLES_HEADING
+
+and reject:
+
+SOURCE_CONTEXT:
+ALL_VEHICLES_CONTEXT
+
+
+If the user asks specifically for:
+
+"All Vehicles"
+
+then use:
+
+SOURCE_CONTEXT:
+ALL_VEHICLES_CONTEXT
+
+and reject values from:
+
+PARTS_TABLE_WITHOUT_ALL_VEHICLES_HEADING
+
+
+The same component may appear in both contexts with
+different part numbers.
+
+Do not merge them.
+Do not substitute one for the other.
 
 SERVICE MANUAL CONTEXT:
 
@@ -149,5 +330,9 @@ SERVICE MANUAL CONTEXT:
             raise ValueError(
                 "Groq returned JSON that does not match the extraction schema."
             ) from error
+
+        for specification in result.results:
+            if specification.vehicle is None:
+                specification.vehicle = "2014 F-150"
 
         return result.model_dump()

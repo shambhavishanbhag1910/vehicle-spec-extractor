@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Specification(BaseModel):
@@ -28,6 +28,31 @@ class Specification(BaseModel):
     page: Optional[int] = None
 
     evidence: str = Field(min_length=1)
+
+    @field_validator("spec_type", mode="before")
+    @classmethod
+    def normalize_spec_type(cls, value):
+
+        if not isinstance(value, str):
+            return value
+
+        normalized = (
+            value.strip()
+            .replace("_", " ")
+            .replace("-", " ")
+            .casefold()
+        )
+
+        mapping = {
+            "part number": "Part Number",
+            "torque": "Torque",
+            "fill capacity": "Fill Capacity"
+        }
+
+        return mapping.get(
+            normalized,
+            value.strip()
+        )
 
 
 class ExtractionResponse(BaseModel):
